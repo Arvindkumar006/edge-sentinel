@@ -1,0 +1,93 @@
+# Edge Sentinel Configuration
+# Designed for local on-device privacy security agent
+
+camera:
+  device_index: 0
+  width: 640
+  height: 480
+  fps: 30
+  auto_reconnect: true
+  reconnect_delay_sec: 2.0
+
+inference:
+  backend: "auto"              # 'auto', 'snapdragon', or 'cpu'
+  qnn_backend_path: "QnnHtp.dll"
+  allow_fallback: true
+
+model:
+  engine: "yolov8"
+  model_path: "models/yolov8n.pt"
+  qnn_model_path: "models/qualcomm/yolov8n.onnx"
+  backend: "auto"
+  device: "cpu"                # Target device for CPU engine
+  input_size: 640
+  target_classes: [0, 67]      # 0: person, 67: cell phone in COCO
+
+detection:
+  confidence_threshold: 0.50
+  iou_threshold: 0.45
+  max_detections: 10
+
+tracking:
+  max_missing_frames: 20   # Frames before a lost track is purged (~0.6-1.0 sec)
+  iou_match_threshold: 0.30
+  dist_match_threshold: 120.0 # Pixel distance threshold for centroid matching
+
+presence:
+  temp_absence_threshold_sec: 2.5  # ACTIVE -> TEMPORARILY_ABSENT
+  absent_threshold_sec: 7.0        # TEMPORARILY_ABSENT -> ABSENT
+  center_weight: 0.40             # Preference for person centered in webcam
+  proximity_weight: 0.35          # Preference for person close to laptop (larger bbox)
+  persistence_weight: 0.25        # Preference for person visible continuously
+
+privacy_zone:
+  enabled: true
+  x_min: 0.25
+  y_min: 0.15
+  x_max: 0.75
+  y_max: 0.90
+
+threat:
+  weight_secondary_detected: 25.0
+  weight_close_workstation: 20.0
+  weight_persistent_presence: 15.0
+  weight_inside_privacy_zone: 15.0
+  weight_approaching_privacy_zone: 15.0
+  weight_primary_absent: 25.0
+  weight_multiple_secondary: 10.0
+  proximity_alert_threshold: 0.45
+  persistence_duration_threshold_sec: 4.0
+  approach_velocity_threshold: 15.0
+  smoothing_factor: 0.40
+  deactivation_hold_sec: 2.0
+  threshold_monitoring: 30.0
+  threshold_warning: 60.0
+  threshold_critical: 80.0
+  device:
+    enabled: true
+    weight_device_detected: 20.0
+    weight_device_inside_zone: 15.0
+    weight_device_held_by_secondary: 25.0
+    weight_device_primary_absent: 20.0
+    proximity_threshold: 0.015
+
+protection:
+  enabled: true
+  warning_overlay_enabled: true
+  strong_overlay_enabled: true
+  lock_workstation_enabled: false     # Disabled by default
+  lock_require_user_absent: true
+  lock_cooldown_sec: 60.0
+  recovery_hold_sec: 3.0
+  warning_alpha: 0.85
+  strong_alpha: 0.95
+
+ui:
+  theme: "dark"
+  window_title: "Edge Sentinel — Active Privacy Defense (Phase 4)"
+  window_width: 1220
+  window_height: 760
+  display_fps: true
+  display_latency: true
+  display_privacy_badge: true
+
