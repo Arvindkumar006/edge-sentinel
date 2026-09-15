@@ -1,94 +1,86 @@
 # Qualcomm Snapdragon AI Acceleration Deployment Guide
 
-This directory contains the deployment workflow and compilation instructions for running Edge Sentinel's YOLOv8n model on Qualcomm Snapdragon Copilot+ PCs (Snapdragon X Elite / X Plus / 8cx Gen 3) powered by Qualcomm Hexagon NPU.
+This directory contains the model export tooling, runtime configuration, and deployment instructions for running Edge Sentinel's YOLOv8n detector on Qualcomm Snapdragon Copilot+ PCs (e.g. Snapdragon X2 Elite X2E88100 / Snapdragon X Elite / X Plus) powered by the Qualcomm Hexagon NPU.
 
 ---
 
-## 1. Architectural Distinction & Truthful Acceleration
+## 1. Architectural Distinction & Execution Flow
 
 ```text
-YOLOv8n PyTorch (.pt)
+PyTorch YOLOv8n Model (.pt)
         ↓
-ONNX Export (opset 17, static shape 1x3x640x640)
+Static ONNX Export (models/qualcomm/export_snapdragon.py: opset 17, static shape 1x3x640x640)
         ↓
-QNN-compatible Conversion / Compilation (qnn-onnx-converter / Qualcomm AI Hub)
+QNN-compatible Snapdragon Runtime (models/qualcomm/yolov8n.onnx)
         ↓
-Qualcomm QNN Context Binary (.bin / .dlc / QNN EP ONNX)
+ONNX Runtime QNNExecutionProvider (QnnHtp.dll backend)
         ↓
-ONNX Runtime QNNExecutionProvider (QnnHtp.dll)
-        ↓
-Verified Snapdragon Hexagon NPU
+Qualcomm Hexagon HTP / NPU (Hardware Acceleration)
 ```
 
 > [!CRITICAL]
-> **Exporting to standard ONNX is NOT NPU execution.**
-> Standard ONNX runs on CPU unless a specialized Execution Provider compiles the graph to NPU machine code. Edge Sentinel will only report `Accelerator: NPU` when `QNNExecutionProvider` with the Hexagon Tensor Processor (`QnnHtp.dll`) is verified at runtime. Otherwise, it gracefully falls back to CPU.
+> **Static ONNX Export vs. QNN Execution:**
+> `models/qualcomm/export_snapdragon.py` exports a static-graph ONNX model with fixed dimensions (`1x3x640x640`, float32, opset 17) required by Qualcomm QNN. It does **not** perform standalone offline QNN binary compilation. Instead, the runtime compilation and NPU graph execution are performed on-device by ONNX Runtime's **`QNNExecutionProvider`** using Qualcomm's `QnnHtp.dll` backend.
+>
+> Edge Sentinel enforces strict truthfulness: it only reports `Accelerator: NPU` and `Status: ACTIVE` when `QNNExecutionProvider` is actively present in the ONNX Runtime session on physical hardware. Otherwise, it gracefully falls back to CPU (`Status: FALLBACK`).
 
 ---
 
-## 2. Prerequisites for Snapdragon Windows PC
+## 2. Verified Hardware Environment
+
+The deployment and NPU execution have been verified on:
+- **Device**: Qualcomm Compute Reference Design SC8480XP / MTP
+- **Processor**: Snapdragon X2 Elite X2E88100 (18 Oryon CPU cores, Hexagon v81 NPU)
+- **OS**: Windows 11 Enterprise (ARM64)
+- **Python**: Python 3.12.9 ARM64
+- **ONNX Runtime**: `onnxruntime-qnn==1.24.4` (native `cp312-win_arm64`)
+- **Backend Provider**: `QNNExecutionProvider` with `QnnHtp.dll`
+- **CPU Fallback**: No (pure NPU execution confirmed via graph optimization and VTCM allocation telemetry)
+
+---
+
+## 3. Prerequisites for Snapdragon ARM64 Windows
 
 On the target Snapdragon Copilot+ PC (ARM64 Windows 11):
-1. **Qualcomm Neural Processing SDK / QNN SDK** (v2.20 or newer):
-   - Install Qualcomm AI Engine Direct SDK (QNN SDK).
-   - Ensure `QnnHtp.dll`, `QnnHtpPrepare.dll`, `QnnHtpV73Stub.dll` (or matching HTP architecture) are in the system `PATH`.
-2. **ONNX Runtime QNN Package**:
+1. **Qualcomm QNN / Hexagon Drivers**:
+   - Ensure Qualcomm AI Engine Direct drivers (`QnnHtp.dll`, `QnnHtpPrepare.dll`, `QnnHtpV*.dll`) are installed with the system BSP or located in system PATH.
+2. **ONNX Runtime with QNN Support**:
    ```bash
-   pip install onnxruntime-qnn
+   pip install onnxruntime-qnn==1.24.4
    ```
-3. **Qualcomm AI Hub Client** (Alternative direct cloud compilation):
-   ```bash
-   pip install qai_hub
-   qai-hub configure --api_token <YOUR_QUALCOMM_AI_HUB_TOKEN>
-   ```
+   *(Note: `onnxruntime-qnn==1.24.4` includes the native Windows ARM64 provider for Hexagon NPU).*
 
 ---
 
-## 3. Model Compilation Workflow
+## 4. Model Preparation Workflow
 
-### Option A: Official Qualcomm AI Hub Path (Recommended)
-Compile directly for Snapdragon X Elite Hexagon NPU:
+### Step 1: Export Static ONNX Graph
+Run the export script to generate the static-shape ONNX model:
 ```bash
-# 1. Export YOLOv8 to torchscript/onnx
-python export_snapdragon.py --format onnx
-
-# 2. Compile via Qualcomm AI Hub CLI for Snapdragon X Elite
-qai-hub compile \
-    --device "Snapdragon X Elite CRD" \
-    --model "models/qualcomm/yolov8n.onnx" \
-    --output-path "models/qualcomm/yolov8n_qnn.bin" \
-    --options "--target_arch hexagon_v73"
+python models/qualcomm/export_snapdragon.py --weights models/yolov8n.pt --output_dir models/qualcomm
 ```
+This generates `models/qualcomm/yolov8n.onnx` with:
+- Static input shape: `1x3x640x640`
+- Precision: `float32`
+- Opset: `17`
+- Size: ~12.2 MB
 
-### Option B: Local Qualcomm QNN Converter
-Using the Qualcomm QNN SDK tools:
-```bash
-# Convert ONNX to QNN model
-qnn-onnx-converter \
-    --input_network models/qualcomm/yolov8n.onnx \
-    --output_path models/qualcomm/yolov8n_qnn.cpp
-
-# Compile into HTP context binary
-qnn-model-lib-generator \
-    -c models/qualcomm/yolov8n_qnn.cpp \
-    -b models/qualcomm/yolov8n_qnn.bin \
-    -t aarch64-windows-msvc
+### Step 2: Runtime Execution via QNN Execution Provider
+Edge Sentinel automatically initializes `QNNExecutionProvider` with HTP options:
+```python
+qnn_options = {
+    "backend_path": "QnnHtp.dll",
+    "htp_performance_mode": "burst",
+    "enable_htp_fp16_precision": "1"
+}
+session = ort.InferenceSession("models/qualcomm/yolov8n.onnx", providers=[("QNNExecutionProvider", qnn_options), "CPUExecutionProvider"])
 ```
 
 ---
 
-## 4. Edge Sentinel Configuration
+## 5. Model Licensing & Considerations
 
-In `config/config.yaml`:
-```yaml
-inference:
-  backend: auto   # 'auto', 'snapdragon', or 'cpu'
+- **YOLOv8 Architecture**: YOLOv8 is developed by Ultralytics and distributed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+- **Commercial Licensing**: Any commercial deployment incorporating YOLOv8 weights or code must adhere to AGPL-3.0 copyleft terms or secure an enterprise commercial license from Ultralytics.
+- **Model Scope**: Edge Sentinel filters YOLOv8 detections strictly for person (COCO class 0) and cell phone (COCO class 67). No biometric identification or facial recognition is performed.
 
-model:
-  qnn_model_path: "models/qualcomm/yolov8n.onnx"
-  engine: "yolov8"
-  input_size: 640
-  target_classes: [0, 67]  # 0: person, 67: cell phone
-```
-
-- When set to `auto`: Edge Sentinel detects if Qualcomm NPU hardware and runtime are present. If verified, it activates `SNAPDRAGON (NPU)`. If not present (e.g. running on AMD64/x86 dev machine), it safely activates CPU fallback without interrupting the security pipeline.

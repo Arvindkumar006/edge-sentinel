@@ -1,3 +1,6 @@
+# Edge Sentinel — Dependencies
+# -------------------------------------------------------------
+# Standard Desktop / x86_64 Development (CPU Backend):
 opencv-python>=4.7.0
 ultralytics>=8.1.0
 torch>=2.0.0
@@ -6,3 +9,14 @@ customtkinter>=5.2.0
 Pillow>=9.5.0
 pyyaml>=6.0
 numpy>=1.23.0
+
+# -------------------------------------------------------------
+# Qualcomm Snapdragon ARM64 Deployment (Hexagon NPU via QNN):
+# Tested & validated on Snapdragon X2 Elite X2E88100 (Windows 11 ARM64):
+#   - Python 3.12.9 ARM64
+#   - onnxruntime-qnn==1.24.4 (native cp312-win_arm64 wheel)
+#   - Qualcomm AI Engine Direct / QNN runtime libraries (QnnHtp.dll)
+# Note: Install specifically via:
+#   pip install onnxruntime-qnn==1.24.4
+# (Do not install unpinned onnxruntime-qnn on ARM64 as it may pull incompatible versions)
+

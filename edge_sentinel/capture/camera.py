@@ -1,7 +1,10 @@
 import threading
 import time
 from typing import Optional, Tuple
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 
 class WebcamCapture:
@@ -26,7 +29,7 @@ class WebcamCapture:
         self.auto_reconnect = auto_reconnect
         self.reconnect_delay_sec = reconnect_delay_sec
 
-        self._cap: Optional[cv2.VideoCapture] = None
+        self._cap = None
         self._lock = threading.Lock()
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -40,6 +43,10 @@ class WebcamCapture:
 
     def start(self) -> bool:
         """Starts the capture background thread."""
+        if cv2 is None:
+            self._error_message = "OpenCV (cv2) is not installed on this system."
+            self._is_opened = False
+            return False
         if self._running:
             return True
 

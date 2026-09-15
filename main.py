@@ -3,23 +3,30 @@ import os
 import argparse
 import time
 
+# Robust UTF-8 stdout handling for Windows CP1252 / SSH environments
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from edge_sentinel.config import load_config
-from edge_sentinel.ui.dashboard import SentinelDashboard
 from edge_sentinel.capture.camera import WebcamCapture
 from edge_sentinel.pipeline import SentinelPipeline
 
-def run_benchmark(duration_seconds: int = 5):
+def run_benchmark(config_path: str = "config/config.yaml", duration_seconds: int = 5):
+
     """
     Runs a headless benchmark on the current machine measuring real FPS,
     inference latency, tracking overhead, and total pipeline latency.
     Strictly reports real hardware measurements without fabrication.
     """
     print(f"\n=======================================================")
-    print(f"   EDGE SENTINEL (PHASE 3) — HARDWARE BENCHMARK")
+    print(f"   EDGE SENTINEL (PHASE 5) — HARDWARE BENCHMARK")
     print(f"=======================================================")
-    config = load_config()
+    config = load_config(config_path)
     
     print(f"[*] Initializing capture device index: {config.camera.device_index}")
     cam = WebcamCapture(
@@ -145,10 +152,11 @@ def main():
     args = parser.parse_args()
 
     if args.benchmark:
-        run_benchmark(duration_seconds=args.duration)
+        run_benchmark(config_path=args.config, duration_seconds=args.duration)
         return
 
     print("[*] Launching Edge Sentinel Desktop Dashboard (Phase 5)...")
+    from edge_sentinel.ui.dashboard import SentinelDashboard
     config = load_config(args.config)
     app = SentinelDashboard(config)
     app.mainloop()

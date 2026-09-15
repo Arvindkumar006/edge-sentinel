@@ -211,19 +211,18 @@ class SnapdragonInferenceEngine(BaseInferenceEngine):
         dw /= 2
         dh /= 2
 
-        import cv2
+        # Pillow + NumPy letterbox preprocessing (100% native ARM64, zero OpenCV dependency)
+        from PIL import Image
+        top = int(round(dh - 0.1))
+        left = int(round(dw - 0.1))
+        pil_img = Image.fromarray(frame)
         if (w0, h0) != new_unpad:
-            resized = cv2.resize(frame, new_unpad, interpolation=cv2.INTER_LINEAR)
-        else:
-            resized = frame.copy()
+            pil_img = pil_img.resize(new_unpad, Image.Resampling.BILINEAR)
+        padded = np.full((self.input_size, self.input_size, 3), 114, dtype=np.uint8)
+        padded[top:top + new_unpad[1], left:left + new_unpad[0]] = np.array(pil_img)
 
-        top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
-        left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
-        padded = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114))
-
-        # Convert BGR -> RGB, HWC -> CHW, normalize 0.0 - 1.0
-        rgb = cv2.cvtColor(padded, cv2.COLOR_BGR2RGB)
-        tensor = rgb.transpose((2, 0, 1)).astype(np.float32) / 255.0
+        # Convert HWC -> CHW, normalize 0.0 - 1.0
+        tensor = padded.transpose((2, 0, 1)).astype(np.float32) / 255.0
         tensor = np.expand_dims(tensor, axis=0)
         return tensor, (h0, w0), r, (int(dw), int(dh))
 
@@ -277,23 +276,41 @@ class SnapdragonInferenceEngine(BaseInferenceEngine):
         x2 = np.clip(x2, 0, w0)
         y2 = np.clip(y2, 0, h0)
 
-        # Non-Maximum Suppression (NMS)
-        import cv2
-        cv_boxes = [[float(x1[i]), float(y1[i]), float(x2[i] - x1[i]), float(y2[i] - y1[i])] for i in range(len(x1))]
-        indices = cv2.dnn.NMSBoxes(cv_boxes, filtered_confs.tolist(), confidence_threshold, 0.45)
+        # Pure NumPy vectorized Non-Maximum Suppression (zero OpenCV dependency)
+        indices = self._numpy_nms(x1, y1, x2, y2, filtered_confs, iou_threshold=0.45)
 
         detections = []
-        if len(indices) > 0:
-            for idx in indices.flatten():
-                c_id = int(filtered_cls[idx])
-                detections.append({
-                    "bbox": [float(x1[idx]), float(y1[idx]), float(x2[idx]), float(y2[idx])],
-                    "confidence": float(filtered_confs[idx]),
-                    "class_id": c_id,
-                    "label": self._class_names.get(c_id, f"class_{c_id}")
-                })
+        for idx in indices:
+            c_id = int(filtered_cls[idx])
+            detections.append({
+                "bbox": [float(x1[idx]), float(y1[idx]), float(x2[idx]), float(y2[idx])],
+                "confidence": float(filtered_confs[idx]),
+                "class_id": c_id,
+                "label": self._class_names.get(c_id, f"class_{c_id}")
+            })
 
         return detections
+
+    @staticmethod
+    def _numpy_nms(x1: np.ndarray, y1: np.ndarray, x2: np.ndarray, y2: np.ndarray, scores: np.ndarray, iou_threshold: float = 0.45) -> List[int]:
+        """Pure NumPy vectorized Non-Maximum Suppression (NMS)."""
+        areas = (x2 - x1) * (y2 - y1)
+        order = scores.argsort()[::-1]
+        keep = []
+        while order.size > 0:
+            i = order[0]
+            keep.append(int(i))
+            xx1 = np.maximum(x1[i], x1[order[1:]])
+            yy1 = np.maximum(y1[i], y1[order[1:]])
+            xx2 = np.minimum(x2[i], x2[order[1:]])
+            yy2 = np.minimum(y2[i], y2[order[1:]])
+            w = np.maximum(0.0, xx2 - xx1)
+            h = np.maximum(0.0, yy2 - yy1)
+            inter = w * h
+            ovr = inter / (areas[i] + areas[order[1:]] - inter + 1e-6)
+            inds = np.where(ovr <= iou_threshold)[0]
+            order = order[inds + 1]
+        return keep
 
     def get_backend_name(self) -> str:
         return "Qualcomm Snapdragon QNN (Hexagon NPU)"

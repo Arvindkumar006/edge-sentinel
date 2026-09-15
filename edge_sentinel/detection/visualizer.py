@@ -1,4 +1,7 @@
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 import numpy as np
 from typing import List, Dict, Any, Optional
 from edge_sentinel.tracking.tracker import TrackedPerson
@@ -56,6 +59,8 @@ class SentinelVisualizer:
     ) -> np.ndarray:
         """Renders bounding boxes, privacy zone, device detections, badges, HUD, and status onto frame."""
         vis = frame.copy()
+        if cv2 is None:
+            return vis
         h, w = vis.shape[:2]
 
 

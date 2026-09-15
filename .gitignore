@@ -25,3 +25,10 @@ build/
 dist/
 *.egg-info/
 scratch/
+
+# Security & Credentials
+*.pem
+*.key
+.env
+credentials*
+secrets*
