@@ -214,7 +214,7 @@ Local Metadata & Telemetry (No raw frames retained)
 ## Repository Structure
 
 ```text
-HYPERBLOOM/
+edge-sentinel/
 ├── .gitignore                          # Protected from committing credentials, keys, or .pem files
 ├── README.md                           # Master architectural & benchmark documentation
 ├── requirements.txt                    # Project dependencies (Desktop CPU vs. ARM64 Snapdragon)
