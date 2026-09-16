@@ -21,7 +21,7 @@ class YOLOInferenceEngine(BaseInferenceEngine):
         self._class_names: Dict[int, str] = {}
 
     def load(self) -> bool:
-        """Loads YOLOv8 model safely."""
+        """Loads YOLOv8 model safely via Ultralytics PyTorch or ONNX Runtime CPU."""
         try:
             from ultralytics import YOLO
             if not os.path.exists(self.model_path):
@@ -32,11 +32,31 @@ class YOLOInferenceEngine(BaseInferenceEngine):
             else:
                 self._model = YOLO(self.model_path)
 
-            self._class_names = getattr(self._model, "names", {0: "person"})
+            self._class_names = getattr(self._model, "names", {0: "person", 67: "cell phone"})
             self._is_loaded = True
             print(f"[YOLOEngine] Loaded model from '{self.model_path}' on device '{self.device}'.")
             return True
         except Exception as e:
+            # Fallback for environments where PyTorch/Ultralytics is unavailable (e.g. Windows ARM64)
+            try:
+                import onnxruntime as ort
+                onnx_candidates = [
+                    "models/qualcomm/yolov8n.onnx",
+                    self.model_path.replace(".pt", ".onnx"),
+                    self.model_path
+                ]
+                onnx_path = next((p for p in onnx_candidates if os.path.exists(p) and p.endswith(".onnx")), None)
+                if onnx_path:
+                    session_options = ort.SessionOptions()
+                    session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                    self._session = ort.InferenceSession(onnx_path, sess_options=session_options, providers=["CPUExecutionProvider"])
+                    self._active_provider = "CPUExecutionProvider"
+                    self._class_names = {0: "person", 67: "cell phone"}
+                    self._is_loaded = True
+                    print(f"[YOLOEngine] Loaded ONNX model '{onnx_path}' on CPUExecutionProvider.")
+                    return True
+            except Exception:
+                pass
             print(f"[YOLOEngine] Failed to load model: {e}")
             self._is_loaded = False
             return False
@@ -50,13 +70,36 @@ class YOLOInferenceEngine(BaseInferenceEngine):
         """
         Runs inference on frame and returns detections + actual measured latency in ms.
         """
-        if not self._is_loaded or self._model is None:
+        if not self._is_loaded or (self._model is None and getattr(self, "_session", None) is None):
             return [], 0.0
 
         if target_classes is None:
             target_classes = [0]  # Default to person only
 
         start_t = time.perf_counter()
+        if hasattr(self, "_session") and self._session is not None:
+            # Predict via ONNX Runtime CPUExecutionProvider
+            try:
+                from edge_sentinel.inference.snapdragon_engine import SnapdragonInferenceEngine
+                input_tensor, orig_shape, ratio, dwdh = SnapdragonInferenceEngine._preprocess(self, frame)
+                input_name = self._session.get_inputs()[0].name
+                outputs = self._session.run(None, {input_name: input_tensor})
+                detections = SnapdragonInferenceEngine._postprocess(
+                    self,
+                    output_tensor=outputs[0],
+                    orig_shape=orig_shape,
+                    ratio=ratio,
+                    dwdh=dwdh,
+                    confidence_threshold=confidence_threshold,
+                    target_classes=target_classes
+                )
+                elapsed_ms = (time.perf_counter() - start_t) * 1000.0
+                return detections, elapsed_ms
+            except Exception as e:
+                elapsed_ms = (time.perf_counter() - start_t) * 1000.0
+                print(f"[YOLOEngine] ONNX CPU inference error: {e}")
+                return [], elapsed_ms
+
         try:
             # Predict with Ultralytics YOLO
             results = self._model.predict(
@@ -94,9 +137,13 @@ class YOLOInferenceEngine(BaseInferenceEngine):
             return [], elapsed_ms
 
     def get_backend_name(self) -> str:
+        if getattr(self, "_session", None) is not None:
+            return "YOLOv8n (ONNX Runtime CPU)"
         return "YOLOv8n (Ultralytics PyTorch Local)"
 
     def get_device(self) -> str:
+        if getattr(self, "_session", None) is not None:
+            return "CPUExecutionProvider (Host System)"
         return f"{self.device.upper()} (Host System)"
 
     def get_backend_type(self) -> str:

@@ -51,11 +51,17 @@ def test_2_snapdragon_backend_interface():
     assert snap_engine.get_model_name() == "YOLOv8n"
     assert snap_engine.get_input_resolution() == (640, 640)
 
-    # On host AMD64 system without QNN, is_available must be False and give reasons
+    # On host AMD64 system without QNN, is_available is False; on ARM64 Snapdragon with QNN, it is True
+    import platform
+    is_arm = "arm64" in platform.machine().lower() or "aarch64" in platform.machine().lower()
     is_avail = snap_engine.is_available()
-    assert is_avail is False
-    reason = snap_engine.get_diagnostic_reason()
-    assert "AMD64" in reason or "x86" in reason or "not found" in reason or "missing" in reason
+    if is_arm:
+        assert is_avail is True
+        assert "verified" in snap_engine.get_diagnostic_reason().lower()
+    else:
+        assert is_avail is False
+        reason = snap_engine.get_diagnostic_reason()
+        assert "AMD64" in reason or "x86" in reason or "not found" in reason or "missing" in reason
 
 def test_3_backend_selection_cpu():
     """Verifies explicit 'cpu' config selects CPU backend without fallback."""
@@ -179,15 +185,16 @@ def test_8_truthful_telemetry_never_fake_npu():
     cpu_engine = YOLOInferenceEngine()
     assert cpu_engine.get_accelerator_type() == "CPU"
 
-    # Even if Snapdragon backend is selected in config on AMD64, pipeline falls back to CPU
-    config = AppConfig()
-    config.inference.backend = "snapdragon"
-    pipeline = SentinelPipeline(config)
-    output = pipeline.process_frame(np.zeros((480, 640, 3), dtype=np.uint8))
+    # Even if Snapdragon backend is selected in config when hardware is unavailable, pipeline falls back to CPU
+    with patch.object(SnapdragonInferenceEngine, "is_available", return_value=False):
+        config = AppConfig()
+        config.inference.backend = "snapdragon"
+        pipeline = SentinelPipeline(config)
+        output = pipeline.process_frame(np.zeros((480, 640, 3), dtype=np.uint8))
 
-    assert output.accelerator_type != "NPU"
-    assert output.backend_status == "FALLBACK"
-    assert "CPU fallback" in output.fallback_notice
+        assert output.accelerator_type != "NPU"
+        assert output.backend_status == "FALLBACK"
+        assert "CPU fallback" in output.fallback_notice
 
 def test_9_snapdragon_runtime_failure_triggers_cpu_fallback():
     """Verifies that if a runtime error occurs during Snapdragon inference, it triggers CPU fallback."""

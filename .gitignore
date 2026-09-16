@@ -25,6 +25,7 @@ build/
 dist/
 *.egg-info/
 scratch/
+*.onnx
 
 # Security & Credentials
 *.pem

@@ -13,11 +13,11 @@
 
 ## Executive Summary
 
-**Edge Sentinel** is an autonomous, privacy-first on-device AI security guardian engineered for enterprise workstations, financial terminals, and privacy-sensitive mobile professionals. By leveraging the **Qualcomm Hexagon v81 NPU** on the **Snapdragon X2 Elite (X2E88100)** Copilot+ PC architecture, Edge Sentinel continuously monitors for **shoulder surfing**, **physical privacy zone breaches**, and **potential screen-capture risks** with microsecond-level latency and near-zero CPU overhead.
+**Edge Sentinel** is an autonomous, privacy-first on-device AI security guardian engineered for enterprise workstations, financial terminals, and privacy-sensitive mobile professionals. By leveraging the **Qualcomm Hexagon v81 NPU** on the **Snapdragon X2 Elite (X2E88100)** Copilot+ PC architecture, Edge Sentinel continuously monitors for **shoulder surfing**, **physical privacy zone breaches**, and **potential screen-capture risks** with ultra-low millisecond latency and near-zero CPU overhead.
 
 ### Key Highlights
 - **Real-Hardware Validated**: 100% verified on physical Qualcomm Compute Reference Design SC8480XP / MTP running Windows 11 Enterprise ARM64.
-- **Microsecond NPU Acceleration**: **3.23 ms** standalone YOLOv8n inference (**309.23 FPS** processing throughput) and **5.55 ms** complete end-to-end pipeline latency (**146.84 FPS** processing throughput) running on the Hexagon NPU.
+- **Millisecond NPU Acceleration**: **3.03 ms - 3.23 ms** standalone YOLOv8n inference (**309.23 - 330.07 FPS** processing throughput) and **5.12 ms - 5.55 ms** complete end-to-end pipeline latency (**146.84 - 193.94 FPS** processing throughput) running on the Hexagon NPU.
 - **Zero CPU Bottleneck**: Only **10.8% CPU utilization** during continuous full-pipeline AI vision, tracking, context estimation, threat scoring, and defense.
 - **Zero-Cloud Privacy Guarantee**: Camera frames are processed strictly in-memory and immediately discarded. Zero network calls, zero raw frame disk persistence, zero facial recognition, and zero biometric embeddings.
 - **Native ARM64 Optimization**: Inference path uses Pillow + pure NumPy vectorized NMS without OpenCV dependencies, ensuring seamless execution on Windows 11 ARM64.
@@ -217,7 +217,9 @@ Local Metadata & Telemetry (No raw frames retained)
 edge-sentinel/
 ├── .gitignore                          # Protected from committing credentials, keys, or .pem files
 ├── README.md                           # Master architectural & benchmark documentation
+├── START_EDGE_SENTINEL.bat              # One-click Windows launcher with priority venv detection
 ├── requirements.txt                    # Project dependencies (Desktop CPU vs. ARM64 Snapdragon)
+├── pytest.ini                          # Automated test discovery configuration
 ├── main.py                             # Application entrypoint (GUI Dashboard & Headless Benchmark)
 │
 ├── config/
@@ -337,13 +339,15 @@ pytest -q
 ```
 
 #### Step E: Execute Hardware Benchmark
-```powershell
-python main.py --benchmark --duration 30
+```cmd
+START_EDGE_SENTINEL.bat --benchmark --duration 30
+:: Or: python main.py --benchmark --duration 30
 ```
 
 #### Step F: Launch Edge Sentinel Desktop Dashboard
-```powershell
-python main.py
+```cmd
+START_EDGE_SENTINEL.bat
+:: Or: python main.py
 ```
 
 ---
@@ -352,15 +356,16 @@ python main.py
 
 Edge Sentinel supports standard x86_64 development machines (Windows, macOS, Linux). When Snapdragon NPU hardware is not detected, the system activates automatic CPU fallback without configuration changes:
 
-```powershell
+```cmd
 # 1. Install standard dependencies
 pip install -r requirements.txt
 
 # 2. Run test suite
 pytest -q
 
-# 3. Launch with automatic CPU fallback
-python main.py
+# 3. Launch with one-click launcher or python
+START_EDGE_SENTINEL.bat
+:: Or: python main.py
 ```
 
 ---
