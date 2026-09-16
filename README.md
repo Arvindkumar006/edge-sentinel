@@ -16,8 +16,8 @@
 **Edge Sentinel** is an autonomous, privacy-first on-device AI security guardian engineered for enterprise workstations, financial terminals, and privacy-sensitive mobile professionals. By leveraging the **Qualcomm Hexagon v81 NPU** on the **Snapdragon X2 Elite (X2E88100)** Copilot+ PC architecture, Edge Sentinel continuously monitors for **shoulder surfing**, **physical privacy zone breaches**, and **potential screen-capture risks** with ultra-low millisecond latency and near-zero CPU overhead.
 
 ### Key Highlights
-- **Real-Hardware Validated**: 100% verified on physical Qualcomm Compute Reference Design SC8480XP / MTP running Windows 11 Enterprise ARM64.
-- **Millisecond NPU Acceleration**: **3.03 ms - 3.23 ms** standalone YOLOv8n inference (**309.23 - 330.07 FPS** processing throughput) and **5.12 ms - 5.55 ms** complete end-to-end pipeline latency (**146.84 - 193.94 FPS** processing throughput) running on the Hexagon NPU.
+- **Real-Hardware Validated**: Verified on a Qualcomm Compute Reference Design SC8480XP / MTP running Windows 11 Enterprise ARM64.
+- **Millisecond NPU Acceleration**: **3.23 ms** standalone YOLOv8n inference (**309.23 FPS** processing throughput) and **5.55 ms** complete end-to-end pipeline latency (**146.84 FPS** processing throughput) running on the Hexagon NPU (with **3.03–3.23 ms** standalone latency and **309.23–330.07 FPS** throughput observed across multiple verified runs).
 - **Zero CPU Bottleneck**: Only **10.8% CPU utilization** during continuous full-pipeline AI vision, tracking, context estimation, threat scoring, and defense.
 - **Zero-Cloud Privacy Guarantee**: Camera frames are processed strictly in-memory and immediately discarded. Zero network calls, zero raw frame disk persistence, zero facial recognition, and zero biometric embeddings.
 - **Native ARM64 Optimization**: Inference path uses Pillow + pure NumPy vectorized NMS without OpenCV dependencies, ensuring seamless execution on Windows 11 ARM64.
@@ -38,11 +38,11 @@
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       PLUGGABLE INFERENCE BACKEND                           │
-│  ┌─────────────────────────────────────┐   ┌─────────────────────────────┐  │
-│  │     Qualcomm Snapdragon Backend     │   │         CPU Backend         │  │
-│  │   Hexagon v81 NPU / QnnHtp.dll      │   │   PyTorch / ONNX Fallback   │  │
-│  │     (3.23 ms YOLOv8n Inference)     │   │      (Safe Auto-Switch)     │  │
-│  └─────────────────────────────────────┘   └─────────────────────────────┘  │
+│  ┌────────────────────────────────┐  ┌───────────────────────────────────┐  │
+│  │  Qualcomm Snapdragon Backend   │  │            CPU Backend            │  │
+│  │  Hexagon v81 NPU / QnnHtp.dll  │  │ ONNX Runtime CPUExecutionProvider │  │
+│  │  (3.23 ms YOLOv8n Inference)   │  │        (Safe Auto-Switch)         │  │
+│  └────────────────────────────────┘  └───────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                        │
                                        ▼
