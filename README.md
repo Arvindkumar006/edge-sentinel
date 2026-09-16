@@ -19,7 +19,7 @@
 - **Real-Hardware Validated**: Verified on a Qualcomm Compute Reference Design SC8480XP / MTP running Windows 11 Enterprise ARM64.
 - **Millisecond NPU Acceleration**: **3.23 ms** standalone YOLOv8n inference (**309.23 FPS** processing throughput) and **5.55 ms** complete end-to-end pipeline latency (**146.84 FPS** processing throughput) running on the Hexagon NPU (with **3.03–3.23 ms** standalone latency and **309.23–330.07 FPS** throughput observed across multiple verified runs).
 - **Zero CPU Bottleneck**: Only **10.8% CPU utilization** during continuous full-pipeline AI vision, tracking, context estimation, threat scoring, and defense.
-- **Zero-Cloud Privacy Guarantee**: Camera frames are processed strictly in-memory and immediately discarded. Zero network calls, zero raw frame disk persistence, zero facial recognition, and zero biometric embeddings.
+- **Zero-Cloud Privacy Guarantee**: Camera frames are processed strictly in-memory and immediately discarded. 0 network calls observed during the real-hardware validation benchmark, zero raw frame disk persistence, zero facial recognition, and zero biometric embeddings.
 - **Native ARM64 Optimization**: Inference path uses Pillow + pure NumPy vectorized NMS without OpenCV dependencies, ensuring seamless execution on Windows 11 ARM64.
 - **Transparent Fallback Architecture**: Pluggable inference layer auto-probes Qualcomm QNN hardware and seamlessly falls back to CPU if unavailable, guaranteeing 100% stability across platforms.
 
@@ -238,7 +238,7 @@ edge-sentinel/
 │   │   ├── __init__.py
 │   │   ├── base.py                     # BaseInferenceEngine abstract interface
 │   │   ├── factory.py                  # Backend selector & automatic CPU fallback manager
-│   │   ├── yolo_engine.py              # Lightweight PyTorch CPU inference engine
+│   │   ├── yolo_engine.py              # CPU inference engine (PyTorch / ONNX Runtime CPU fallback)
 │   │   ├── snapdragon_engine.py        # Qualcomm QNN Hexagon NPU engine (Pillow + pure NumPy NMS)
 │   │   └── validator.py                # Model compatibility & schema validation utility
 │   │

@@ -25,12 +25,11 @@ class YOLOInferenceEngine(BaseInferenceEngine):
         try:
             from ultralytics import YOLO
             if not os.path.exists(self.model_path):
-                print(f"[YOLOEngine] Model path '{self.model_path}' not found. Downloading yolov8n.pt...")
-                self._model = YOLO("yolov8n.pt")
-                # Save locally if needed
-                os.makedirs(os.path.dirname(self.model_path) or ".", exist_ok=True)
-            else:
-                self._model = YOLO(self.model_path)
+                raise FileNotFoundError(
+                    f"[YOLOEngine] Model path '{self.model_path}' not found. "
+                    "Edge Sentinel requires local model files and does not perform automatic network downloads."
+                )
+            self._model = YOLO(self.model_path)
 
             self._class_names = getattr(self._model, "names", {0: "person", 67: "cell phone"})
             self._is_loaded = True
